@@ -65,6 +65,7 @@ namespace ScanDrop
         private async void InitializeDropbox()
         {
             Status.Text = "Connecting to Dropbox..";
+
             if (IsReadyToAuthenticate())
             {
                 // we just got back from dropbox's oauth web page, so we must have a request token. try to close the cycle.
@@ -73,17 +74,16 @@ namespace ScanDrop
 
                 // reload page, so that "ReturnFromOauth" data is never accidentally triggered.
                 NavigationService.Navigate(new Uri("/MainPage.xaml", UriKind.Relative));
-            }
-            else
-            {
-                await cloudStore.Load();
-            }
 
-            if (cloudStore.IsAuthenticated)
-            {
-                OnAuthenticated();
+                return;
             }
-            else
+            
+            // ok, we didn't just confirm a request token. normal flow starts now. load auth status
+            // from file storage or request auth token if somehow signed out of dropbox (or this is the first
+            // run on this phone).
+            var authStatus = await cloudStore.Load();
+
+            if (authStatus.NeedsAuthorization)
             {
                 Status.Text = "No login info available";
                 // no sign in at all, let's get oauthed.
@@ -91,9 +91,13 @@ namespace ScanDrop
                 {
                     MessageBox.Show("Not signed in to dropbox. Opening browser...");
                     var browser = new WebBrowserTask();
-                    browser.Uri = new Uri(cloudStore.AuthorizationUrl);
+                    browser.Uri = new Uri(authStatus.AuthorizationUrl);
                     browser.Show();
                 });
+            }
+            else
+            {
+                OnAuthenticated();
             }
         }
 
