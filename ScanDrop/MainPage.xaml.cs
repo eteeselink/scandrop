@@ -22,39 +22,9 @@ namespace ScanDrop
         private string currentTab;
         private const string LatestPhotoFilename = "LatestPhoto.jpg";
 
-        private Task<Stream> LoadPhoto()
-        {
-            return Task.Run(() =>
-            {
-                return (Stream)LocalStorage.Load(LatestPhotoFilename, (stream) =>
-                {
-                    var ms = new MemoryStream();
-                    stream.CopyTo(ms);
-                    ms.Seek(0, SeekOrigin.Begin);
-                    return ms;
-                });
-            });
-        }
-
-        private Task SavePhoto(Stream chosenPhoto)
-        {
-            return Task.Run(() =>
-            {
-                LocalStorage.Save(LatestPhotoFilename, stream =>
-                {
-                    chosenPhoto.Seek(0, SeekOrigin.Begin);
-                    chosenPhoto.CopyTo(stream);
-                });
-            });
-        }
-
-        // Constructor
         public MainPage()
         {
             InitializeComponent();
-
-            // Sample code to localize the ApplicationBar
-            //BuildLocalizedApplicationBar();
         }
 
         private void StartScan()
@@ -123,9 +93,12 @@ namespace ScanDrop
                     }
                 });
 
-                Prefix.Text = DateTime.Now.ToString("yyyy-MM-dd_HH:mm_");
-                Filename.Focus();
-                Filename.SelectAll();
+                Deployment.Current.Dispatcher.BeginInvoke(() =>
+                {
+                    Prefix.Text = DateTime.Now.ToString("yyyy-MM-dd_HH:mm_");
+                    Filename.Focus();
+                    Filename.SelectAll();
+                });
             }
             else
             {
@@ -135,16 +108,9 @@ namespace ScanDrop
         }
 
         protected override void OnNavigatedTo(NavigationEventArgs e)
-        {
-            //if(e.NavigationMode == NavigationMode.Back)
-            {
-                //NavigationService.GoBack();
-            }
-            //else
-            {
-                ShowRequestedPage();
-                InitializeDropbox();
-            }
+        {           
+            ShowRequestedPage();
+            InitializeDropbox();
 
             base.OnNavigatedTo(e);
         }
@@ -215,6 +181,33 @@ namespace ScanDrop
             {
                 Status.Text = "Couldn't upload! " + e.Message;
             }
+        }
+
+
+        private Task<Stream> LoadPhoto()
+        {
+            return Task.Run(() =>
+            {
+                return (Stream)LocalStorage.Load(LatestPhotoFilename, (stream) =>
+                {
+                    var ms = new MemoryStream();
+                    stream.CopyTo(ms);
+                    ms.Seek(0, SeekOrigin.Begin);
+                    return ms;
+                });
+            });
+        }
+
+        private Task SavePhoto(Stream chosenPhoto)
+        {
+            return Task.Run(() =>
+            {
+                LocalStorage.Save(LatestPhotoFilename, stream =>
+                {
+                    chosenPhoto.Seek(0, SeekOrigin.Begin);
+                    chosenPhoto.CopyTo(stream);
+                });
+            });
         }
     }
 }
