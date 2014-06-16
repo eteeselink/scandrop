@@ -97,7 +97,7 @@ namespace ScanDrop
                 // OnNavigatedTo was already on the ui thread? Ahwell.
                 Deployment.Current.Dispatcher.BeginInvoke(() =>
                 {
-                    Prefix.Text = DateTime.Now.ToString("yyyy-MM-dd_HH:mm_");
+                    Prefix.Text = DateTime.Now.ToString("yyyy-MM-dd_HH.mm_");
                     Filename.Focus();
                     Filename.SelectAll();
                 });

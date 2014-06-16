@@ -41,7 +41,7 @@
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>
                 </Grid.RowDefinitions>
-                <TextBlock x:Name="Prefix" Grid.Row="0" Grid.Column="0" VerticalAlignment="Center" Text="2012-11-14_13:33_"/>
+                <TextBlock x:Name="Prefix" Grid.Row="0" Grid.Column="0" VerticalAlignment="Center" Text="2012-11-14_13.33_"/>
                 <TextBox x:Name="Filename" Grid.Row="0" Grid.Column="1" Text="Filename" />
                 <TextBlock x:Name="Extension" Grid.Row="0" Grid.Column="2" VerticalAlignment="Center" Text=".jpg"/>
             </Grid>
