@@ -93,6 +93,8 @@ namespace ScanDrop
                     }
                 });
 
+                // for reasons completely past my understanding, we need to do this inside the UI thread for it to work. I thought 
+                // OnNavigatedTo was already on the ui thread? Ahwell.
                 Deployment.Current.Dispatcher.BeginInvoke(() =>
                 {
                     Prefix.Text = DateTime.Now.ToString("yyyy-MM-dd_HH:mm_");

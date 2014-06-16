@@ -30,7 +30,7 @@
         </Grid>
 
         <StackPanel Grid.Row="0" x:Name="WorkPanel">
-            <Image x:Name="PreviewImage" Grid.Row="3" Grid.Column="0" Grid.ColumnSpan="4" Stretch="Uniform" Width="200" Source="/Assets/ApplicationIcon.png"/>
+            <Image x:Name="PreviewImage" Grid.Row="3" Grid.Column="0" Grid.ColumnSpan="4" Stretch="Uniform" Height="250" Source="/Assets/ApplicationIcon.png"/>
 
             <Grid x:Name="ContentPanel" Grid.Row="1" Margin="12,0,12,0">
                 <Grid.ColumnDefinitions>
