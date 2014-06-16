@@ -59,20 +59,6 @@ namespace Moo
             t.Wait();
         }
 
-        
 
-        public void UsesrLogin()
-        {
-            var u = new UserLogin
-            {
-                Secret = "moo",
-                Token = "maa"
-            };
-            var serializer = new DataContractJsonSerializer(typeof(SerializeableUserLogin));
-            var str = new MemoryStream();
-            serializer.WriteObject(str, new SerializeableUserLogin(u));
-            var arr = str.ToArray();
-            Debug.WriteLine(Encoding.UTF8.GetString(arr, 0, arr.Length));
-        }
     }
 }

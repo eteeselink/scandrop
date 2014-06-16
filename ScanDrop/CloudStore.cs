@@ -14,7 +14,9 @@ using System.Threading.Tasks;
 
 namespace ScanDrop
 {
-
+    /// <summary>
+    /// Necessary because UserLogin does not have [DataMember] attrs around its members. Annoying.
+    /// </summary>
     [DataContract]
     public class SerializeableUserLogin
     {
@@ -61,27 +63,27 @@ namespace ScanDrop
 
         public async Task<AuthenticationStatus> Load()
         {
-            var accessToken = (await LoadObject<SerializeableUserLogin>(AccessTokenFn)).AsUserLogin();
+            var accessToken = await LocalStorage.LoadObject<SerializeableUserLogin>(AccessTokenFn);
             if ((accessToken == null) || (accessToken.Secret == null))
             {
                 var requestToken = await dropnet.GetRequestToken();
-                await SaveObject(RequestTokenFn, new SerializeableUserLogin(requestToken));
+                await LocalStorage.SaveObject(RequestTokenFn, new SerializeableUserLogin(requestToken));
                 return new AuthenticationStatus(true, dropnet.BuildAuthorizeUrl(requestToken, @"superset-scandrop:hello"));
             } 
             else
             {
-                SignIn(accessToken);
+                SignIn(accessToken.AsUserLogin());
                 return new AuthenticationStatus(false, null);
             }
         }
 
         public async Task Authenticate()
         {
-            var storedRequestToken = (await LoadObject<SerializeableUserLogin>(RequestTokenFn)).AsUserLogin();
-            dropnet.SetUserToken(storedRequestToken);
+            var storedRequestToken = await LocalStorage.LoadObject<SerializeableUserLogin>(RequestTokenFn);
+            dropnet.SetUserToken(storedRequestToken.AsUserLogin());
             var accessToken = await dropnet.GetAccessToken();
             SignIn(accessToken);
-            await SaveObject(AccessTokenFn, new SerializeableUserLogin(accessToken));            
+            await LocalStorage.SaveObject(AccessTokenFn, new SerializeableUserLogin(accessToken));            
         }
 
         private void SignIn(UserLogin accessToken)
@@ -89,66 +91,15 @@ namespace ScanDrop
             dropnet.SetUserToken(accessToken);
         }
 
-        public async Task SaveFile(string sourceFilename, string targetFilename)
+        public async Task SaveFile(Stream sourceData, string targetFilename)
         {
-            var bytes = Encoding.UTF8.GetBytes(sourceFilename);
-            await dropnet.Upload("/", targetFilename, bytes);
-        }
-
-        private Task SaveObject<T>(string filename, T data)
-        {
-            return Task.Run(() => 
+            var metadata = await dropnet.Upload("/", targetFilename, sourceData);
+            if(metadata.Name != targetFilename)
             {
-                Save(filename, (stream) =>
-                {
-                    var serializer = new DataContractJsonSerializer(typeof(T));
-                    serializer.WriteObject(stream, data);
-                });
-            });
-        }
-
-        private Task<T> LoadObject<T>(string filename)
-        {
-            return Task.Run(() =>
-            {
-                return Load<T>(filename, (stream) =>
-                {
-                    var serializer = new DataContractJsonSerializer(typeof(T));
-                    return (T)serializer.ReadObject(stream);
-                });
-            });
-        }
-
-        private T Load<T>(string filename, Func<Stream, T> reader)
-        {
-            using (var store = IsolatedStorageFile.GetUserStoreForApplication())
-            {
-                if (store.FileExists(filename))
-                {
-                    using (var stream = new IsolatedStorageFileStream(filename, FileMode.OpenOrCreate, FileAccess.Read, store))
-                    {
-                        try
-                        {
-                            return reader(stream);
-                        }
-                        catch (Exception)
-                        {
-                            // silently ignore failures: something is iffy.
-                        }
-                    }
-                }
-            }
-            return default(T);
-        }
-
-        private void Save(string filename, Action<Stream> writer)
-        {
-            using (var store = IsolatedStorageFile.GetUserStoreForApplication())
-            using (var stream = new IsolatedStorageFileStream(filename, FileMode.Create, FileAccess.Write, store))
-            {
-                writer(stream);
+                throw new Exception("Filenames dont match!");
             }
         }
+
 
         /// <summary>
         /// Tuple class returned from Load(). C# could use some shorthand for this stuff.

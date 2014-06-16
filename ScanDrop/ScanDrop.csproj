@@ -95,6 +95,7 @@
     </Compile>
     <Compile Include="CloudStore.cs" />
     <Compile Include="LocalizedStrings.cs" />
+    <Compile Include="LocalStorage.cs" />
     <Compile Include="MainPage.xaml.cs">
       <DependentUpon>MainPage.xaml</DependentUpon>
     </Compile>

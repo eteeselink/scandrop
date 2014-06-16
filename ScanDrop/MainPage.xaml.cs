@@ -11,13 +11,42 @@ using ScanDrop.Resources;
 using Microsoft.Phone.Tasks;
 using System.Windows.Media.Imaging;
 using System.IO;
+using System.Threading.Tasks;
+using System.ComponentModel;
 
 namespace ScanDrop
 {
     public partial class MainPage : PhoneApplicationPage
     {
         private CloudStore cloudStore = new CloudStore();
-        private string chosenPhotoFilename;
+        private string currentTab;
+        private const string LatestPhotoFilename = "LatestPhoto.jpg";
+
+        private Task<Stream> LoadPhoto()
+        {
+            return Task.Run(() =>
+            {
+                return (Stream)LocalStorage.Load(LatestPhotoFilename, (stream) =>
+                {
+                    var ms = new MemoryStream();
+                    stream.CopyTo(ms);
+                    ms.Seek(0, SeekOrigin.Begin);
+                    return ms;
+                });
+            });
+        }
+
+        private Task SavePhoto(Stream chosenPhoto)
+        {
+            return Task.Run(() =>
+            {
+                LocalStorage.Save(LatestPhotoFilename, stream =>
+                {
+                    chosenPhoto.Seek(0, SeekOrigin.Begin);
+                    chosenPhoto.CopyTo(stream);
+                });
+            });
+        }
 
         // Constructor
         public MainPage()
@@ -28,18 +57,22 @@ namespace ScanDrop
             //BuildLocalizedApplicationBar();
         }
 
-        private void Image_Tap(object sender, System.Windows.Input.GestureEventArgs e)
+        private void StartScan()
         {
             var task = new CameraCaptureTask();
             task.Completed += (object photoSender, PhotoResult result) =>
             {
                 if (result.TaskResult == TaskResult.OK)
                 {
-                    var bmp = new System.Windows.Media.Imaging.BitmapImage();
-                    bmp.SetSource(result.ChosenPhoto);
-                    PreviewImage.Source = bmp;
+                    SavePhoto(result.ChosenPhoto);
 
-                    chosenPhotoFilename = result.OriginalFileName;
+                    ShowDropTab();
+                }
+                else
+                {
+                    // called when the user presses "back" on the camera task. as the camera task "feels" like the
+                    // first screen, we want the app to terminate when this happens.
+                    App.Current.Terminate();
                 }
             };
             task.Show();
@@ -48,12 +81,71 @@ namespace ScanDrop
 
         private void OnAuthenticated()
         {
-            Status.Text = "Hooray!";
+            Status.Text = "Signed in to Dropbox.";
+            SigninPleaseWait.Visibility = Visibility.Collapsed;
+
+            if (currentTab == "Load")
+            {
+                StartScan();
+            }
+        }
+
+        private void ShowLoadTab()
+        {
+            NavigationService.Navigate(new Uri("/MainPage.xaml?Tab=Load", UriKind.Relative));
+        }
+
+        private void ShowDropTab()
+        {
+            NavigationService.Navigate(new Uri("/MainPage.xaml?Tab=Drop", UriKind.Relative));
+        }
+
+        private void ShowRequestedPage()
+        {
+            NavigationContext.QueryString.TryGetValue("Tab", out currentTab);
+            currentTab = currentTab ?? "Load";
+
+            if (currentTab == "Drop")
+            {
+                WorkPanel.Visibility = Visibility.Visible;
+                LoadingPanel.Visibility = Visibility.Collapsed;
+
+                LoadPhoto().ContinueWith(photo =>
+                {
+                    if (photo.Result != null)
+                    {
+                        Deployment.Current.Dispatcher.BeginInvoke(() => 
+                        {
+                            var bmp = new System.Windows.Media.Imaging.BitmapImage();
+                            bmp.SetSource(photo.Result);
+                            PreviewImage.Source = bmp;
+                        });
+                    }
+                });
+
+                Prefix.Text = DateTime.Now.ToString("yyyy-MM-dd_HH:mm_");
+                Filename.Focus();
+                Filename.SelectAll();
+            }
+            else
+            {
+                WorkPanel.Visibility = Visibility.Collapsed;
+                LoadingPanel.Visibility = Visibility.Visible;
+            }
         }
 
         protected override void OnNavigatedTo(NavigationEventArgs e)
         {
-            InitializeDropbox();
+            //if(e.NavigationMode == NavigationMode.Back)
+            {
+                //NavigationService.GoBack();
+            }
+            //else
+            {
+                ShowRequestedPage();
+                InitializeDropbox();
+            }
+
             base.OnNavigatedTo(e);
         }
 
@@ -73,7 +165,7 @@ namespace ScanDrop
                 await cloudStore.Authenticate();
 
                 // reload page, so that "ReturnFromOauth" data is never accidentally triggered.
-                NavigationService.Navigate(new Uri("/MainPage.xaml", UriKind.Relative));
+                ShowLoadTab();
 
                 return;
             }
@@ -101,15 +193,28 @@ namespace ScanDrop
             }
         }
 
-        private async void DropButton_Tap(object sender, System.Windows.Input.GestureEventArgs e)
+        private async void DropButton_Tap(object sender, System.Windows.Input.GestureEventArgs evt)
         {
-            var filename = Filename.Text;
-            if(chosenPhotoFilename == null)
+            var filename = Prefix.Text + Filename.Text + Extension.Text;
+            var photo = await LoadPhoto();
+            if (photo == null)
             {
                 MessageBox.Show("First picture take, you must!");
                 return;
             }
-            await cloudStore.SaveFile(chosenPhotoFilename, filename);
+
+            try
+            {
+                Status.Text = "Uploading..";
+                await cloudStore.SaveFile(photo, filename);
+                Status.Text = "Uploaded " + filename + ".";
+                MessageBox.Show("Uploaded " + filename + ".");
+                ShowLoadTab();
+            }
+            catch(Exception e)
+            {
+                Status.Text = "Couldn't upload! " + e.Message;
+            }
         }
     }
 }
