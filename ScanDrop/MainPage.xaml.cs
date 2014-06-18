@@ -13,6 +13,7 @@ using System.Windows.Media.Imaging;
 using System.IO;
 using System.Threading.Tasks;
 using System.ComponentModel;
+using Windows.Storage;
 
 namespace ScanDrop
 {
@@ -27,22 +28,23 @@ namespace ScanDrop
             InitializeComponent();
         }
 
-        private void StartScan()
+        private void StartScan(bool takePicture = true)
         {
-            var task = new CameraCaptureTask();
+            var task = takePicture 
+                ? (ChooserBase<PhotoResult>)new CameraCaptureTask()
+                : (ChooserBase<PhotoResult>)new PhotoChooserTask();
+
             task.Completed += (object photoSender, PhotoResult result) =>
             {
                 if (result.TaskResult == TaskResult.OK)
                 {
                     SavePhoto(result.ChosenPhoto);
-
                     ShowDropTab();
                 }
                 else
                 {
-                    // called when the user presses "back" on the camera task. as the camera task "feels" like the
-                    // first screen, we want the app to terminate when this happens.
-                    App.Current.Terminate();
+                    // called when the user presses "back" on the camera task.
+                    ShowScanTab();
                 }
             };
             task.Show();
@@ -70,42 +72,87 @@ namespace ScanDrop
             NavigationService.Navigate(new Uri("/MainPage.xaml?Tab=Drop", UriKind.Relative));
         }
 
+
+        private void ShowScanTab()
+        {
+            NavigationService.Navigate(new Uri("/MainPage.xaml?Tab=Scan", UriKind.Relative));
+        }
+
+        private DateTime GetCreationDate(Stream imageData)
+        {
+            DateTime creationDate;
+
+            // Using ExifLib to read creationDate. Not using `using` on purpose, because then ExifReader disposes `photo` as well.
+            var reader = new ExifLib.ExifReader(imageData);
+
+            // Found by experimenting that WP-made photos have DateTimeOriginal set. Good enough!
+            reader.GetTagValue<DateTime>(ExifLib.ExifTags.DateTimeOriginal, out creationDate);
+
+            // rewind stream.
+            imageData.Seek(0, SeekOrigin.Begin);
+
+            return creationDate;
+        }
+
+        private void SetupDropTab(Task<Stream> photoResult)
+        {
+            var photo = photoResult.Result;
+            if (photo != null)
+            {
+                DateTime creationDate = GetCreationDate(photo);
+
+                Deployment.Current.Dispatcher.BeginInvoke(() =>
+                {
+                    var bmp = new System.Windows.Media.Imaging.BitmapImage();
+                    bmp.SetSource(photo);
+                    PreviewImage.Source = bmp;
+
+                    Prefix.Text = creationDate.ToString("yyyy-MM-dd_HH.mm_");
+                });
+            }
+        }
+
         private void ShowRequestedPage()
         {
             NavigationContext.QueryString.TryGetValue("Tab", out currentTab);
             currentTab = currentTab ?? "Load";
 
-            if (currentTab == "Drop")
+            switch(currentTab)
             {
-                WorkPanel.Visibility = Visibility.Visible;
-                LoadingPanel.Visibility = Visibility.Collapsed;
+                case "Scan":
+                    LoadingPanel.Visibility = Visibility.Collapsed;
+                    ScanPanel.Visibility = Visibility.Visible;
+                    WorkPanel.Visibility = Visibility.Collapsed;
 
-                LoadPhoto().ContinueWith(photo =>
-                {
-                    if (photo.Result != null)
+                    while(NavigationService.BackStack.Any()) 
+                        NavigationService.RemoveBackEntry();
+
+                    break;
+
+                case "Drop":
+                    LoadingPanel.Visibility = Visibility.Collapsed;
+                    ScanPanel.Visibility = Visibility.Collapsed;
+                    WorkPanel.Visibility = Visibility.Visible;
+
+                    LoadPhoto().ContinueWith(SetupDropTab);
+
+                    // for reasons completely past my understanding, we need to do this inside the UI thread for it to work. I thought 
+                    // OnNavigatedTo was already on the ui thread? Ahwell.
+                    Deployment.Current.Dispatcher.BeginInvoke(() =>
                     {
-                        Deployment.Current.Dispatcher.BeginInvoke(() => 
-                        {
-                            var bmp = new System.Windows.Media.Imaging.BitmapImage();
-                            bmp.SetSource(photo.Result);
-                            PreviewImage.Source = bmp;
-                        });
-                    }
-                });
+                        
+                        Filename.Focus();
+                        Filename.SelectAll();
+                    });
+                    break;
 
-                // for reasons completely past my understanding, we need to do this inside the UI thread for it to work. I thought 
-                // OnNavigatedTo was already on the ui thread? Ahwell.
-                Deployment.Current.Dispatcher.BeginInvoke(() =>
-                {
-                    Prefix.Text = DateTime.Now.ToString("yyyy-MM-dd_HH.mm_");
-                    Filename.Focus();
-                    Filename.SelectAll();
-                });
-            }
-            else
-            {
-                WorkPanel.Visibility = Visibility.Collapsed;
-                LoadingPanel.Visibility = Visibility.Visible;
+                case "Load":
+                default:
+                    LoadingPanel.Visibility = Visibility.Visible;
+                    ScanPanel.Visibility = Visibility.Collapsed;
+                    WorkPanel.Visibility = Visibility.Collapsed;
+                    break;
+
             }
         }
 
@@ -210,6 +257,25 @@ namespace ScanDrop
                     chosenPhoto.CopyTo(stream);
                 });
             });
+        }
+
+        private void TakePictureButton_Tap(object sender, System.Windows.Input.GestureEventArgs e)
+        {
+            StartScan();
+        }
+
+        private void ChoosePictureButton_Tap(object sender, System.Windows.Input.GestureEventArgs e)
+        {
+            StartScan(false);
+        }
+
+        private async void PreviewImage_Tap(object sender, System.Windows.Input.GestureEventArgs e)
+        {
+            // Because we store our image in ApplicationData, we can just launch the picture viewer with a file reference.
+            // The OS finds out the appropriate association for ".jpg". This took a *long* time to find out, by the way.
+            var file = await LocalStorage.Folder.GetFileAsync(LatestPhotoFilename);
+
+            await Windows.System.Launcher.LaunchFileAsync(file);
         }
     }
 }

@@ -16,21 +16,31 @@
     <!--LayoutRoot is the root grid where all page content is placed-->
     <Grid x:Name="LayoutRoot" Background="Transparent">
         <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
+        <StackPanel Grid.Row="0" Margin="12,17,0,0">
+            <TextBlock Text="SCANDROP" Style="{StaticResource PhoneTextNormalStyle}"/>
+        </StackPanel>
 
-
-        <Grid Visibility="Collapsed" Grid.Row="0" x:Name="LoadingPanel">
-            <Grid.RowDefinitions>
-                <RowDefinition Height="*"/>
-            </Grid.RowDefinitions>
+        <StackPanel Visibility="Collapsed" VerticalAlignment="Center" Grid.Row="1" x:Name="LoadingPanel">
             <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center" Grid.Row="0" x:Name="SigninPleaseWait">Please wait while we sign you in to Dropbox..</TextBlock>
-        </Grid>
+        </StackPanel>
 
-        <StackPanel Grid.Row="0" x:Name="WorkPanel">
-            <Image x:Name="PreviewImage" Grid.Row="3" Grid.Column="0" Grid.ColumnSpan="4" Stretch="Uniform" Height="250" Source="/Assets/ApplicationIcon.png"/>
+        <StackPanel Visibility="Collapsed" Grid.Row="1" x:Name="ScanPanel">
+            <TextBlock Text="options" Margin="21,-7,0,28" Style="{StaticResource PhoneTextTitle1Style}"/>
+            <StackPanel>
+                <Button Tap="TakePictureButton_Tap">Take Picture</Button>
+                <Button Tap="ChoosePictureButton_Tap">Choose From Album</Button>
+            </StackPanel>
+        </StackPanel>
+
+        <StackPanel Grid.Row="1" x:Name="WorkPanel">
+            <Grid Width="400" Height="250" Grid.Row="3" Grid.Column="0" Grid.ColumnSpan="4">
+                <Image Margin="0,0,0,0" x:Name="PreviewImage" VerticalAlignment="Center" Stretch="UniformToFill" Height="Auto" Width="400" Source="/Assets/ApplicationIcon.png" Tap="PreviewImage_Tap"/>
+            </Grid>
 
             <Grid x:Name="ContentPanel" Grid.Row="1" Margin="12,0,12,0">
                 <Grid.ColumnDefinitions>

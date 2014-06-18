@@ -155,6 +155,9 @@
     <Reference Include="DropNetRT">
       <HintPath>..\packages\DropNetRT.1.2\lib\portable-net45+sl50+win+wpa81+wp80\DropNetRT.dll</HintPath>
     </Reference>
+    <Reference Include="ExifLib">
+      <HintPath>..\packages\ExifLib.1.5.1.0\lib\sl3-wp\ExifLib.dll</HintPath>
+    </Reference>
     <Reference Include="Microsoft.Threading.Tasks">
       <HintPath>..\packages\Microsoft.Bcl.Async.1.0.165\lib\wp8\Microsoft.Threading.Tasks.dll</HintPath>
     </Reference>

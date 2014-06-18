@@ -1,11 +1,11 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
-using System.IO.IsolatedStorage;
 using System.Linq;
 using System.Runtime.Serialization.Json;
 using System.Text;
 using System.Threading.Tasks;
+using Windows.Storage;
 
 namespace ScanDrop
 {
@@ -35,45 +35,40 @@ namespace ScanDrop
             });
         }
 
+        public static StorageFolder Folder
+        {
+            get
+            {
+                return Windows.Storage.ApplicationData.Current.LocalFolder;
+            }
+        }
+
         public static T Load<T>(string filename, Func<Stream, T> reader)
         {
-            using (var store = IsolatedStorageFile.GetUserStoreForApplication())
+            var folder = Folder;
+            try
             {
-                if (store.FileExists(filename))
-                {
-                    using (var stream = new IsolatedStorageFileStream(filename, FileMode.OpenOrCreate, FileAccess.Read, store))
-                    {
-                        try
-                        {
-                            return reader(stream);
-                        }
-                        catch (Exception)
-                        {
-                            // silently ignore failures: something is iffy.
-                        }
-                    }
+                var file = folder.GetFileAsync(filename).AsTask().Result;
+                using(var stream = file.OpenStreamForReadAsync().Result)
+                { 
+                    return reader(stream);
                 }
             }
+            catch (Exception)
+            {
+                // silently ignore failures: something is iffy.
+            }
+
             return default(T);
         }
 
         public static void Save(string filename, Action<Stream> writer)
         {
-            using (var store = IsolatedStorageFile.GetUserStoreForApplication())
-            using (var stream = new IsolatedStorageFileStream(filename, FileMode.Create, FileAccess.Write, store))
+            var folder = Folder;
+            var file = folder.CreateFileAsync(filename, CreationCollisionOption.ReplaceExisting).AsTask().Result;
+            using(var stream = file.OpenStreamForWriteAsync().Result)
             {
                 writer(stream);
-            }
-        }
-
-        public static void Delete(string filename)
-        {
-            using (var store = IsolatedStorageFile.GetUserStoreForApplication())
-            {
-                if (store.FileExists(filename))
-                {
-                    store.DeleteFile(filename);
-                }
             }
         }
     }
