@@ -22,6 +22,7 @@ namespace ScanDrop
         private CloudStore cloudStore = new CloudStore();
         private string currentTab;
         private const string LatestPhotoFilename = "LatestPhoto.jpg";
+        private const string LatestPhotoFilenameCompressed = "LatestPhoto_Compressed.jpg";
 
         public MainPage()
         {
@@ -34,11 +35,11 @@ namespace ScanDrop
                 ? (ChooserBase<PhotoResult>)new CameraCaptureTask()
                 : (ChooserBase<PhotoResult>)new PhotoChooserTask();
 
-            task.Completed += (object photoSender, PhotoResult result) =>
+            task.Completed += async (object photoSender, PhotoResult result) =>
             {
                 if (result.TaskResult == TaskResult.OK)
                 {
-                    SavePhoto(result.ChosenPhoto);
+                    await SavePhoto(result.ChosenPhoto);
                     ShowDropTab();
                 }
                 else
@@ -134,7 +135,7 @@ namespace ScanDrop
                     ScanPanel.Visibility = Visibility.Collapsed;
                     WorkPanel.Visibility = Visibility.Visible;
 
-                    LoadPhoto().ContinueWith(SetupDropTab);
+                    LoadPhoto(LatestPhotoFilename).ContinueWith(SetupDropTab);
 
                     // for reasons completely past my understanding, we need to do this inside the UI thread for it to work. I thought 
                     // OnNavigatedTo was already on the ui thread? Ahwell.
@@ -211,7 +212,7 @@ namespace ScanDrop
         private async void DropButton_Tap(object sender, System.Windows.Input.GestureEventArgs evt)
         {
             var filename = Prefix.Text + Filename.Text + Extension.Text;
-            var photo = await LoadPhoto();
+            var photo = await LoadPhoto(LatestPhotoFilenameCompressed);
             if (photo == null)
             {
                 MessageBox.Show("First picture take, you must!");
@@ -233,11 +234,11 @@ namespace ScanDrop
         }
 
 
-        private Task<Stream> LoadPhoto()
+        private Task<Stream> LoadPhoto(string filename)
         {
             return Task.Run(() =>
             {
-                return (Stream)LocalStorage.Load(LatestPhotoFilename, (stream) =>
+                return (Stream)LocalStorage.Load(filename, (stream) =>
                 {
                     var ms = new MemoryStream();
                     stream.CopyTo(ms);
@@ -249,11 +250,27 @@ namespace ScanDrop
 
         private Task SavePhoto(Stream chosenPhoto)
         {
-            return Task.Run(() =>
+            return Dispatcher.InvokeAsync(() =>
             {
+                // save compressed file
+                chosenPhoto.Seek(0, SeekOrigin.Begin);
+
+                var bitmap = new BitmapImage
+                {
+                    CreateOptions = BitmapCreateOptions.None
+                };
+                bitmap.SetSource(chosenPhoto);
+                var wbitmap = new WriteableBitmap(bitmap);
+
+                LocalStorage.Save(LatestPhotoFilenameCompressed, stream =>
+                {
+                    wbitmap.SaveJpeg(stream, bitmap.PixelWidth / 2, bitmap.PixelHeight / 2, 0, 80);
+                });
+
+                // save original, for exif data.
+                chosenPhoto.Seek(0, SeekOrigin.Begin);
                 LocalStorage.Save(LatestPhotoFilename, stream =>
                 {
-                    chosenPhoto.Seek(0, SeekOrigin.Begin);
                     chosenPhoto.CopyTo(stream);
                 });
             });
